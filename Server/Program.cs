@@ -1,49 +1,55 @@
-﻿
-using Core;
-using Core.Messages;
+﻿using ICMT.Core.Helpers;
+using IMCT.Core;
+using IMCT.Core.Messages;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 
-namespace ICMPTransfer
+namespace IMCT
 {
     class Server
     {
-
-        private static readonly IReadOnlyList<byte> MAGIC = new byte[] { (byte)'l', (byte)'e', (byte)'e', (byte)'t' };
         public static void Main()
         {
-            Console.WriteLine("Hello, World!");
 
             Directory.CreateDirectory("received_files");
+            Console.WriteLine("Files can be found in \"./received_files/\"");
+            Socket socket = new(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
 
-            Socket listener = new(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
-            listener.Bind(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 0));
-            listener.IOControl(IOControlCode.ReceiveAll, new byte[] { 1, 0, 0, 0 }, new byte[] { 1, 0, 0, 0 });
+            var lip = IPAddress.Parse("127.0.0.1");
 
-            //EndPoint ep = new IPEndPoint(IPAddress.Any, 0);
+            socket.Bind(new IPEndPoint(lip, 0));
+            socket.IOControl(IOControlCode.ReceiveAll, new byte[] { 1, 0, 0, 0 }, new byte[] { 1, 0, 0, 0 });
+
+            Console.WriteLine($"Bound listener.");
+
+            EndPoint ep = new IPEndPoint(IPAddress.Any, 0);
             while (true)
             {
                 Message.ResetSession(); // New session begun :) 
 
+                Console.WriteLine("Listening for first message");
+
                 byte[] rawMsg = new byte[4096];
-                _ = listener.Receive(rawMsg);
+                _ = socket.ReceiveFrom(rawMsg, ref ep);
 
                 var message = new Message(rawMsg);
+                Console.WriteLine($"Message of type {message.MessageType} received.");
+
                 if (!message.IsValid()) continue;
                 if (message.MessageType != MessageType.SetupMessage) continue;
 
                 //A setup message is expected and checked
                 var setupMessage = new SetupMessage(rawMsg);
-
-                using (var outStream = new FileStream(Path.Combine("received_files", setupMessage.FileName), FileMode.Create))
+                var newFile = Path.Combine("received_files", setupMessage.FileName);
+                Console.WriteLine($"Writing data to file {newFile}");
+                using (var outStream = new FileStream(newFile, FileMode.Create))
                 {
                     using (var sw = new BinaryWriter(outStream))
                     {
                         while (true)
                         {
                             rawMsg = new byte[4096];
-                            listener.Receive(rawMsg);
+                            socket.Receive(rawMsg);
 
                             message = new Message(rawMsg);
                             if (!message.IsValid()) continue; // Repeat messages, corrupt or wrong session
@@ -51,18 +57,32 @@ namespace ICMPTransfer
 
                             if (message.MessageType == MessageType.DataMessage)
                             {
-                                var dataMessage = new DataMessage(rawMsg);
+                                DataMessage dataMessage = new(rawMsg);
                                 sw.Write(dataMessage.Data);
+
+                                //Console.WriteLine($"Wrote {dataMessage.DataLength} bytes to file");
                             }
                             else if (message.MessageType == MessageType.CompletionMessage)
                             {
-                                // check CRC
+                                sw.Flush();
+                                sw.Close();
+
+                                CompletionMessage complMsg = new(rawMsg);
+                                var checksum = ChecksumHelper.GetFileChecksum(newFile);
+
+                                if (!Enumerable.SequenceEqual(checksum, complMsg.Checksum))
+                                {
+                                    Console.WriteLine("WARN: Checksum of local file does not match sent file.");
+                                }
+                                Console.WriteLine("Checksum for received file is:\t0x" + BitConverter.ToUInt32(complMsg.Checksum).ToString("X2"));
+                                Console.WriteLine("Checksum for sent file is:\t0x" + BitConverter.ToUInt32(checksum).ToString("X2"));
+
                                 break;
                             }
                         }
                     }
                 }
-                break;
+                //break;
             }
 
             Console.WriteLine("Done.");

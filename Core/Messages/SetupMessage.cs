@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace Core.Messages
+namespace IMCT.Core.Messages
 {
     public class SetupMessage : Message, IMessage
     {

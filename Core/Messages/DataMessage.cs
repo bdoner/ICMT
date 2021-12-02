@@ -1,4 +1,4 @@
-﻿namespace Core.Messages
+﻿namespace IMCT.Core.Messages
 {
     public class DataMessage : Message, IMessage
     {
