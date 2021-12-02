@@ -1,8 +1,4 @@
-﻿using IMCT.Core.Messages;
-using System.Net.NetworkInformation;
-using System.Text;
-
-namespace IMCT
+﻿namespace ICMT
 {
     class Client
     {

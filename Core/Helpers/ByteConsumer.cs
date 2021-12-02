@@ -1,4 +1,4 @@
-﻿namespace IMCT.Core.Helpers
+﻿namespace ICMT.Core.Helpers
 {
     public class ByteConsumer
     {

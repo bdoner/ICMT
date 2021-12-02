@@ -1,13 +1,8 @@
 ﻿using ICMT.Core.Helpers;
-using IMCT.Core.Messages;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using ICMT.Core.Messages;
 using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace IMCT
+namespace ICMT
 {
     internal class ICMTClient
     {

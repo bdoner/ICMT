@@ -1,6 +1,6 @@
-﻿using IMCT.Core.Helpers;
+﻿using ICMT.Core.Helpers;
 
-namespace IMCT.Core.Messages
+namespace ICMT.Core.Messages
 {
     public class Message : IMessage
     {

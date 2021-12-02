@@ -1,4 +1,4 @@
-﻿namespace IMCT.Core
+﻿namespace ICMT.Core
 {
     public enum MessageType : byte
     {

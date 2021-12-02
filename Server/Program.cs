@@ -1,10 +1,10 @@
 ﻿using ICMT.Core.Helpers;
-using IMCT.Core;
-using IMCT.Core.Messages;
+using ICMT.Core;
+using ICMT.Core.Messages;
 using System.Net;
 using System.Net.Sockets;
 
-namespace IMCT
+namespace ICMT
 {
     class Server
     {
