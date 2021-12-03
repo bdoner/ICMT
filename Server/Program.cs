@@ -18,8 +18,10 @@ namespace ICMT
             var lip = IPAddress.Parse("127.0.0.1");
 
             socket.Bind(new IPEndPoint(lip, 0));
+#if Windows
             socket.IOControl(IOControlCode.ReceiveAll, new byte[] { 1, 0, 0, 0 }, new byte[] { 1, 0, 0, 0 });
-
+#else
+#endif
             Console.WriteLine($"Bound listener.");
 
             EndPoint ep = new IPEndPoint(IPAddress.Any, 0);
