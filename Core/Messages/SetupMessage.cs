@@ -12,7 +12,7 @@ namespace ICMT.Core.Messages
         /// <summary>
         /// n bytes. Depending on <see cref="FileNameLength"/>
         /// </summary>
-        public string FileName { get; set; }
+        public string FileName { get; set; } = null!;
 
         public SetupMessage(byte[] rawIcmpMessage) : base(rawIcmpMessage)
         {

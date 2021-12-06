@@ -7,6 +7,10 @@ namespace ICMT
     internal class ICMTClient
     {
         public int Timeout { get; set; } = 10000;
+        /// <summary>
+        /// If a DataMessage fails to get a success response, how many times to retry sending it before continuing?
+        /// </summary>
+        public int MaxDataMessageRetries { get; set; } = 5;
         public string Host { get; private set; }
 
         private Ping pinger;
@@ -30,10 +34,18 @@ namespace ICMT
 
         public void Send(string file)
         {
-            SendSetupMessage(file);
-            SendDataMessage(file);
+            var setupStatus = SendSetupMessage(file);
+            if(setupStatus != IPStatus.Success)
+            {
+                throw new Exception("Failed to setup-ping target. Ping status returned as: " + setupStatus);
+            }
+            SendFile(file);
             var checksum = ChecksumHelper.GetFileChecksum(file);
-            SendCompletionMessage(checksum);
+            var completionMessage = SendCompletionMessage(checksum);
+            if (completionMessage != IPStatus.Success)
+            {
+                throw new Exception("Failed to complete-ping target. Ping status returned as: " + completionMessage);
+            }
         }
 
         private IPStatus SendSetupMessage(string file)
@@ -53,7 +65,8 @@ namespace ICMT
             return reply.Status;
         }
 
-        private void SendDataMessage(string file)
+
+        private void SendFile(string file)
         {
             using (var br = new BinaryReader(new FileStream(file, FileMode.Open)))
             {
@@ -61,16 +74,31 @@ namespace ICMT
                 int r = 0;
                 while (0 < (r = br.Read(buff)))
                 {
-                    var data = DataMessage.Empty();
-                    data.SequenceNumber = sequenceNum++;
-                    data.SessionId = sessionId;
-                    data.Data = buff;
-                    data.DataLength = (UInt16)r;
-
-                    var buffer = data.Serialize();
-
-                    _ = pinger.Send(Host, Timeout, buffer, pingOptions);
+                    SendDataMessage(buff, (ushort)r);
                 }
+            }
+        }
+
+        private void SendDataMessage(byte[] chunk, ushort dataLength)
+        {
+            var data = DataMessage.Empty();
+            data.SequenceNumber = sequenceNum++;
+            data.SessionId = sessionId;
+            data.Data = chunk;
+            data.DataLength = dataLength;
+
+            _sendDataMessage(data, 1);
+
+        }
+
+        private void _sendDataMessage(DataMessage msg, int tryCount)
+        {
+            var buffer = msg.Serialize();
+
+            var reply = pinger.Send(Host, Timeout, buffer, pingOptions);
+            if (reply.Status != IPStatus.Success && tryCount < MaxDataMessageRetries)
+            {
+                _sendDataMessage(msg, ++tryCount);
             }
         }
 

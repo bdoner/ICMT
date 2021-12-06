@@ -8,15 +8,14 @@ namespace ICMT
 {
     class Server
     {
-        public static void Main()
+        public static void Main(string[] args)
         {
 
             Directory.CreateDirectory("received_files");
             Console.WriteLine("Files can be found in \"./received_files/\"");
             Socket socket = new(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
 
-            var lip = IPAddress.Parse("127.0.0.1");
-
+            var lip = IPAddress.Parse(args[0]);
             socket.Bind(new IPEndPoint(lip, 0));
 #if Windows
             socket.IOControl(IOControlCode.ReceiveAll, new byte[] { 1, 0, 0, 0 }, new byte[] { 1, 0, 0, 0 });
@@ -32,7 +31,7 @@ namespace ICMT
                 Console.WriteLine("Listening for first message");
 
                 byte[] rawMsg = new byte[4096];
-                _ = socket.ReceiveFrom(rawMsg, ref ep);
+                _ = socket.Receive(rawMsg);
 
                 var message = new Message(rawMsg);
                 Console.WriteLine($"Message of type {message.MessageType} received.");

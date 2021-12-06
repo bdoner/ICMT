@@ -2,17 +2,24 @@
 {
     class Client
     {
-        public static void Main()
+        public static void Main(string[] args)
         {
             //Thread.Sleep(2000);
             Console.WriteLine("Hello, World!");
 
-            var photo = @"photo.jpg";
-            var host = "127.0.0.1";
+            var photo = args[0]; // @"photo.jpg";
+            var host = args[1]; // "hurtig.ninja";
 
             ICMTClient client = new(host);
-            client.Send(photo);
+            try
+            {
+                client.Send(photo);
 
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+            }
 
             Console.WriteLine("----------------------");
 

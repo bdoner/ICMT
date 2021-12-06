@@ -5,7 +5,7 @@
         /// <summary>
         /// 4 bytes. CRC-32 sum
         /// </summary>
-        public byte[] Checksum { get; set; }
+        public byte[] Checksum { get; set; } = null!;
 
         public CompletionMessage(byte[] rawIcmpMessage) : base(rawIcmpMessage)
         {

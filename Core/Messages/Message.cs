@@ -4,7 +4,7 @@ namespace ICMT.Core.Messages
 {
     public class Message : IMessage
     {
-        internal readonly ByteConsumer Consumer;
+        internal readonly ByteConsumer Consumer = null!;
         protected static readonly IReadOnlyList<byte> _magic = new byte[] { 0x69, 0x63, 0x6d, 0x74 };
         private bool _isValid = true;
 
@@ -14,7 +14,7 @@ namespace ICMT.Core.Messages
         /// <summary>
         /// 4 bytes
         /// </summary>
-        public byte[] Magic { get; set; }
+        public byte[] Magic { get; set; } = null!;
 
         /// <summary>
         /// 4 bytes
@@ -29,7 +29,7 @@ namespace ICMT.Core.Messages
         /// <summary>
         /// 4 bytes
         /// </summary>
-        public byte[] SessionId { get; set; }
+        public byte[] SessionId { get; set; } = null!;
 
 
         public Message(byte[] rawIcmpMessage)

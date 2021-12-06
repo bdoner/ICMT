@@ -10,7 +10,7 @@
         /// <summary>
         /// n bytes, depending on <see cref="DataLength"/>
         /// </summary>
-        public byte[] Data { get; set; }
+        public byte[] Data { get; set; } = null!;
 
         public DataMessage(byte[] rawIcmpMessage) : base(rawIcmpMessage)
         {
