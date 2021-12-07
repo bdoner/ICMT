@@ -51,12 +51,6 @@ void create_rcv_dir()
         perror("could not create './received_files' directory");
         exit(-1);
     }
-
-    int uid = atoi(getenv("SUDO_UID"));
-    int cr = chown(rf, uid, uid);
-    if(cr < 0) {
-        perror("could not chown directory './received_files'");
-    }
 }
 
 int create_file(char *fileName)
@@ -70,17 +64,11 @@ int create_file(char *fileName)
     printf("creating file %s\n", finalPath);
 
     int fd = open(finalPath, O_RDWR | O_CREAT, 0644);
-    //free(finalPath);
+    free(finalPath);
 
     if(fd < 0) {
         perror("could not create file");
         exit(-1);
-    }
-    
-    int uid = atoi(getenv("SUDO_UID"));
-    int cr = fchown(fd, uid, uid);
-    if(cr < 0) {
-        perror("could not chown file");
     }
 
     return fd;
@@ -95,6 +83,18 @@ int main(int argc, char **argv)
     //printf("uid: %d\neuid: %d\nSUDO_UID: %s\n", getuid(), geteuid(), getenv("SUDO_UID"));
 
     int sockfd = bind_socket(argv[1]);
+
+    //drop privs
+    if(setgid(atoi(getenv("SUDO_GID"))) < 0)
+    {
+        perror("could not drop group privs");
+    }
+
+    if(setuid(atoi(getenv("SUDO_UID"))) < 0)
+    {
+        perror("could not drop user privs");
+    }
+
     create_rcv_dir();
 
     const int BUFF_SIZE = 1500;
