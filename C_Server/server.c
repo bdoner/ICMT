@@ -1,47 +1,117 @@
-#include "server.h"
+#include "ICMT.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
 #include <string.h>
 
 #define PROTO_ICMP 1
 #define TRUE 1
 #define FALSE 0
 
-
-int main(int argc, char **argv)
+int bind_socket(char *addr) 
 {
-
-    for(int i = 0; i < argc; i++) {
-        printf("Argc (%d) is '%s'\n", i, argv[i]);
-    }
-
     struct sockaddr_in sock_addr;
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_port = htons(0);
-    inet_aton(argv[1], &sock_addr.sin_addr.s_addr);
+    inet_aton(addr, &sock_addr.sin_addr.s_addr);
 
     int sockfd = socket(AF_INET, SOCK_RAW, PROTO_ICMP);
     if (sockfd == -1)
     {
         perror("could not create socket");
-        return -1;
+        exit(-1);
     }
-    bind(sockfd, &sock_addr, sizeof(sock_addr));
+    
+    int bindres = bind(sockfd, &sock_addr, sizeof(sock_addr));
+    if(bindres == -1) 
+    {
+        perror("could not bind socket");
+        exit(-1);
+    }
 
-    const int BUFF_SIZE = 2000;
+    return sockfd;
+}
+
+void create_rcv_dir() 
+{
+    const char rf[] = "./received_files/";
+
+    struct stat st = {0};
+    if(-1 != stat(rf, &st)) 
+    {
+        return;
+    }
+
+    int fd = mkdir(rf, 0755);
+    if(fd < 0) {
+        perror("could not create './received_files' directory");
+        exit(-1);
+    }
+
+    int uid = atoi(getenv("SUDO_UID"));
+    int cr = chown(rf, uid, uid);
+    if(cr < 0) {
+        perror("could not chown directory './received_files'");
+    }
+}
+
+int create_file(char *fileName)
+{
+    const char rf[] = "./received_files/";
+    char *finalPath = malloc(strlen(rf) + strlen(fileName) + 1);
+    strcat(finalPath, rf);
+    strcat(finalPath, fileName);
+    finalPath[strlen(rf) + strlen(fileName)] = 0;
+
+    printf("creating file %s\n", finalPath);
+
+    int fd = open(finalPath, O_RDWR | O_CREAT, 0644);
+    //free(finalPath);
+
+    if(fd < 0) {
+        perror("could not create file");
+        exit(-1);
+    }
+    
+    int uid = atoi(getenv("SUDO_UID"));
+    int cr = fchown(fd, uid, uid);
+    if(cr < 0) {
+        perror("could not chown file");
+    }
+
+    return fd;
+}
+
+int main(int argc, char **argv)
+{
+    for(int i = 0; i < argc; i++) {
+        printf("argv[%d] = '%s'\n", i, argv[i]);
+    }
+
+    //printf("uid: %d\neuid: %d\nSUDO_UID: %s\n", getuid(), geteuid(), getenv("SUDO_UID"));
+
+    int sockfd = bind_socket(argv[1]);
+    create_rcv_dir();
+
+    const int BUFF_SIZE = 1500;
     char buff[BUFF_SIZE];
+    char icmp_msg[BUFF_SIZE];
 
     while (TRUE)
     {
-        //clear buffer
-        memset(buff, 0, BUFF_SIZE);
         message_head_t msg_head;
 
-        ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);        
-        memcpy(&msg_head, buff + 28, sizeof(message_head_t));
+        // clear buffer
+        memset(buff, 0, BUFF_SIZE);
+        
+        ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);
+        memcpy(&icmp_msg, buff + 28  /* skip IP header */, BUFF_SIZE - 28);
+
+        memcpy(&msg_head, icmp_msg, sizeof(message_head_t));
 
         if(0 != memcmp(msg_head.magic, ICMT_MACIG, 4)) {
             continue;
@@ -59,16 +129,19 @@ int main(int argc, char **argv)
         if (msg_head.messageType == MSGTYPE_SETUP) {
             message_setup_t msg_setup;
             // fill struct
-            memcpy(&msg_setup, buff + 28, recv_size); 
+            memcpy(&msg_setup, icmp_msg, sizeof(message_setup_t));
             // set filename terminating null byte
             msg_setup.fileName[msg_setup.fileNameLength + 1] = 0;
 
             printf("setup message fileNameLength is %d and filename '%s'\n\n", msg_setup.fileNameLength, msg_setup.fileName);
-            fflush(stdout);
-
+            
+            // get fd for final file
+            fd = create_file(msg_setup.fileName);
+            dprintf(fd, "test\n");
+            close(fd);
         } 
 
-        for (int i = 0; i < recv_size; i++)
+        for (int i = 0; i < recv_size-28; i++)
         {
             if (i != 0 && i % 8 == 0)
             {
@@ -85,7 +158,7 @@ int main(int argc, char **argv)
                     printf(" ");
                 }
             }
-            printf("%02hhx ", buff[i]);
+            printf("%02hhx ", icmp_msg[i]);
         }
 
         printf("\n-----\n");
