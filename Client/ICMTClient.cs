@@ -74,7 +74,8 @@ namespace ICMT
                 int r = 0;
                 while (0 < (r = br.Read(buff)))
                 {
-                    SendDataMessage(buff, (ushort)r);
+                    byte[] t = buff.ToList().Take(r).ToArray();
+                    SendDataMessage(t, (ushort)r);
                 }
             }
         }
@@ -94,6 +95,8 @@ namespace ICMT
         private void _sendDataMessage(DataMessage msg, int tryCount)
         {
             var buffer = msg.Serialize();
+
+            Console.WriteLine(string.Join(",", buffer.Select(x => x.ToString("x02"))));
 
             var reply = pinger.Send(Host, Timeout, buffer, pingOptions);
             if (reply.Status != IPStatus.Success && tryCount < MaxDataMessageRetries)

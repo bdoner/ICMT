@@ -61,6 +61,7 @@ int create_file(char *fileName)
     strcat(finalPath, fileName);
     finalPath[strlen(rf) + strlen(fileName)] = 0;
 
+    unlink(finalPath);
     printf("creating file %s\n", finalPath);
 
     int fd = open(finalPath, O_RDWR | O_CREAT, 0644);
@@ -74,74 +75,44 @@ int create_file(char *fileName)
     return fd;
 }
 
-int main(int argc, char **argv)
+void drop_privs()
 {
-    for(int i = 0; i < argc; i++) {
-        printf("argv[%d] = '%s'\n", i, argv[i]);
+
+    char *sudo_gid = getenv("SUDO_GID");
+    int gid = getgid();
+
+    if(sudo_gid != NULL && 0 < strlen(sudo_gid)) {
+        gid = atoi(sudo_gid);
     }
 
-    //printf("uid: %d\neuid: %d\nSUDO_UID: %s\n", getuid(), geteuid(), getenv("SUDO_UID"));
-
-    int sockfd = bind_socket(argv[1]);
-
-    //drop privs
-    if(setgid(atoi(getenv("SUDO_GID"))) < 0)
+    if(setgid(gid) < 0)
     {
         perror("could not drop group privs");
     }
 
-    if(setuid(atoi(getenv("SUDO_UID"))) < 0)
+
+    char *sudo_uid = getenv("SUDO_UID"); 
+    int uid = getuid();
+
+    if(sudo_uid != NULL && 0 < strlen(sudo_uid)) {
+        uid = atoi(sudo_uid);
+    }
+
+    if(setuid(uid) < 0)
     {
         perror("could not drop user privs");
     }
+}
 
-    create_rcv_dir();
+unsigned int checksum_file(int fd_file)
+{
 
-    const int BUFF_SIZE = 1500;
-    char buff[BUFF_SIZE];
-    char icmp_msg[BUFF_SIZE];
+    return 1;
+}
 
-    while (TRUE)
-    {
-        message_head_t msg_head;
+void print_msg(char *buff, int buffsize) {
 
-        // clear buffer
-        memset(buff, 0, BUFF_SIZE);
-        
-        ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);
-        memcpy(&icmp_msg, buff + 28  /* skip IP header */, BUFF_SIZE - 28);
-
-        memcpy(&msg_head, icmp_msg, sizeof(message_head_t));
-
-        if(0 != memcmp(msg_head.magic, ICMT_MACIG, 4)) {
-            continue;
-        }
-
-        printf("message magic (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
-            msg_head.magic[0], msg_head.magic[1], msg_head.magic[2], msg_head.magic[3]);
-        printf("\tseqNum (uint): %u\n", msg_head.sequenceNum);
-        printf("\ttype (char): %d\n", msg_head.messageType);
-        printf("\tsessionId (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
-            msg_head.sessionId[0], msg_head.sessionId[1], msg_head.sessionId[2], msg_head.sessionId[3]);
-        fflush(stdout);
-
-        int fd = -1;
-        if (msg_head.messageType == MSGTYPE_SETUP) {
-            message_setup_t msg_setup;
-            // fill struct
-            memcpy(&msg_setup, icmp_msg, sizeof(message_setup_t));
-            // set filename terminating null byte
-            msg_setup.fileName[msg_setup.fileNameLength + 1] = 0;
-
-            printf("setup message fileNameLength is %d and filename '%s'\n\n", msg_setup.fileNameLength, msg_setup.fileName);
-            
-            // get fd for final file
-            fd = create_file(msg_setup.fileName);
-            dprintf(fd, "test\n");
-            close(fd);
-        } 
-
-        for (int i = 0; i < recv_size-28; i++)
+    for (int i = 0; i < buffsize; i++)
         {
             if (i != 0 && i % 8 == 0)
             {
@@ -158,9 +129,116 @@ int main(int argc, char **argv)
                     printf(" ");
                 }
             }
-            printf("%02hhx ", icmp_msg[i]);
+            printf("%02hhx ", buff[i]);
         }
 
         printf("\n-----\n");
+}
+
+int main(int argc, char **argv)
+{
+    for(int i = 0; i < argc; i++) {
+        printf("argv[%d] = '%s'\n", i, argv[i]);
+    }
+
+    //printf("uid: %d\neuid: %d\nSUDO_UID: %s\n", getuid(), geteuid(), getenv("SUDO_UID"));
+
+    int sockfd = bind_socket(argv[1]);
+    drop_privs();
+    create_rcv_dir();
+
+    const int BUFF_SIZE = 1500;
+    char buff[BUFF_SIZE];
+    char icmp_msg[BUFF_SIZE];
+    
+    int fd = -1; // file to write to
+    message_setup_t msg_setup; // contains sessionId
+    long lastSeqNum = -1; // check sequence
+    while (TRUE)
+    {
+        message_head_t msg_head;
+
+        // clear buffer
+        memset(buff, 0, BUFF_SIZE);
+        memset(icmp_msg, 0, BUFF_SIZE);
+        
+        ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);
+        memcpy(&icmp_msg, buff + 28  /* skip IP header */, BUFF_SIZE - 28);
+
+        memcpy(&msg_head, icmp_msg, sizeof(message_head_t));
+
+        if(0 != memcmp(msg_head.magic, ICMT_MACIG, 4)) {
+            continue;
+        }
+       
+
+        printf("message magic (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
+            msg_head.magic[0], msg_head.magic[1], msg_head.magic[2], msg_head.magic[3]);
+        printf("\tseqNum (uint): %u\n", msg_head.sequenceNum);
+        printf("\ttype (char): %d\n", msg_head.messageType);
+        printf("\tsessionId (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
+            msg_head.sessionId[0], msg_head.sessionId[1], msg_head.sessionId[2], msg_head.sessionId[3]);
+        
+        //print_msg(buff, recv_size);
+
+        if(msg_head.sequenceNum <= lastSeqNum) {
+            printf("last seq was %d this seq is %u\n", lastSeqNum, msg_head.sequenceNum);
+            continue;
+        }
+
+        lastSeqNum = msg_head.sequenceNum;
+
+        //printf("PAST seq-check:\n");
+
+        if (msg_head.messageType == MSGTYPE_SETUP) 
+        {
+            printf("SETUP:\n");
+            // fill struct
+            memcpy(&msg_setup, icmp_msg, sizeof(message_setup_t));
+            // set filename terminating null byte
+            msg_setup.fileName[msg_setup.fileNameLength + 1] = 0;
+
+            // get fd for final file
+            fd = create_file(msg_setup.fileName);
+        } 
+        else if(msg_head.messageType == MSGTYPE_DATA)
+        {
+            printf("DATA:\n");
+
+            message_data_t msg_data;
+            memcpy(&msg_data, icmp_msg, sizeof(message_data_t));
+
+            printf("sizeof(icmp_msg): %d\n", sizeof(icmp_msg));
+            printf("sizeof(message_data_t): %d\n", sizeof(message_data_t));
+            printf("sizeof(unsigned short): %d\n", sizeof(unsigned short));
+            printf("fd: %d\n", fd);
+            printf("msg_data.dataLength: %hu\n", msg_data.dataLength);
+            print_msg(&msg_data, sizeof(message_data_t));
+
+            ssize_t w = write(fd, msg_data.data, 131);
+            if(w == -1) 
+            {
+                perror("error writing file");
+            }
+
+            printf("Wrote %d bytes of %d\n", w, msg_data.dataLength);
+
+        }
+        else if(msg_head.messageType == MSGTYPE_COMPLETE)
+        {
+            printf("COMPLETE:\n");
+
+            message_complete_t msg_complete;
+            memcpy(&msg_complete, icmp_msg, sizeof(message_complete_t));
+
+            fflush(fd);
+
+            // checksum file before closing fd
+            unsigned int checksum = checksum_file(fd);
+            printf("Server checksum:\t%04x\nClient checksum:\t%04x\n", checksum, msg_complete.checksum);
+
+            close(fd);
+        }
+        
     }
 }

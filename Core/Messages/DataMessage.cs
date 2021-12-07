@@ -5,7 +5,7 @@
         /// <summary>
         /// 2 bytes
         /// </summary>
-        public UInt16 DataLength { get; set; }
+        public ushort DataLength { get; set; }
 
         /// <summary>
         /// n bytes, depending on <see cref="DataLength"/>
