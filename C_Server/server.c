@@ -1,3 +1,4 @@
+#include "server.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -9,48 +10,18 @@
 #define TRUE 1
 #define FALSE 0
 
-typedef struct {
-    char magic[4];
-    unsigned int sequenceNum;
-    char messageType;
-    char sessionId[4];
-} message_head;
 
-typedef struct {
-    char magic[4];
-    unsigned long sequenceNum;
-    char messageType;
-    char sessionId[4];
-    char fileNameLength;
-    char *fileName;
-} message_setup;
-
-typedef struct {
-    char magic[4];
-    unsigned long sequenceNum;
-    char messageType;
-    char sessionId[4];
-    unsigned short dataLength;
-    char *data;
-} message_data;
-
-typedef struct {
-    char magic[4];
-    unsigned long sequenceNum;
-    char messageType;
-    char sessionId[4];
-    unsigned long checksum;
-} message_completion;
-
-
-
-int main()
+int main(int argc, char **argv)
 {
+
+    for(int i = 0; i < argc; i++) {
+        printf("Argc (%d) is '%s'\n", i, argv[i]);
+    }
 
     struct sockaddr_in sock_addr;
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_port = htons(0);
-    inet_aton("127.0.0.1", &sock_addr.sin_addr.s_addr);
+    inet_aton(argv[1], &sock_addr.sin_addr.s_addr);
 
     int sockfd = socket(AF_INET, SOCK_RAW, PROTO_ICMP);
     if (sockfd == -1)
@@ -67,18 +38,35 @@ int main()
     {
         //clear buffer
         memset(buff, 0, BUFF_SIZE);
-        message_head msg_head;
+        message_head_t msg_head;
 
-        ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);
-        
-        memcpy(&msg_head, buff + 28, sizeof(message_head));
+        ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);        
+        memcpy(&msg_head, buff + 28, sizeof(message_head_t));
+
+        if(0 != memcmp(msg_head.magic, ICMT_MACIG, 4)) {
+            continue;
+        }
 
         printf("message magic (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
             msg_head.magic[0], msg_head.magic[1], msg_head.magic[2], msg_head.magic[3]);
-        printf("\tseqNum (ulong): %lu\n", msg_head.sequenceNum);
+        printf("\tseqNum (uint): %u\n", msg_head.sequenceNum);
         printf("\ttype (char): %d\n", msg_head.messageType);
         printf("\tsessionId (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
             msg_head.sessionId[0], msg_head.sessionId[1], msg_head.sessionId[2], msg_head.sessionId[3]);
+        fflush(stdout);
+
+        int fd = -1;
+        if (msg_head.messageType == MSGTYPE_SETUP) {
+            message_setup_t msg_setup;
+            // fill struct
+            memcpy(&msg_setup, buff + 28, recv_size); 
+            // set filename terminating null byte
+            msg_setup.fileName[msg_setup.fileNameLength + 1] = 0;
+
+            printf("setup message fileNameLength is %d and filename '%s'\n\n", msg_setup.fileNameLength, msg_setup.fileName);
+            fflush(stdout);
+
+        } 
 
         for (int i = 0; i < recv_size; i++)
         {
