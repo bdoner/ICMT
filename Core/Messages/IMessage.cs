@@ -5,12 +5,12 @@
         /// <summary>
         /// 4 bytes
         /// </summary>
-        public byte[] Magic { get; set; }
+        public uint Magic { get; set; }
 
         /// <summary>
         /// 4 bytes
         /// </summary>
-        public UInt32 SequenceNumber { get; set; }
+        public uint SequenceNumber { get; set; }
 
         /// <summary>
         /// 1 byte

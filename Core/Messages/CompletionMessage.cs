@@ -21,7 +21,7 @@
         public static CompletionMessage Empty()
         {
             CompletionMessage msg = new();
-            msg.Magic = Message._magic.ToArray();
+            msg.Magic = Message._magic;
             msg.MessageType = MessageType.CompletionMessage;
             return msg;
         }

@@ -1,25 +1,27 @@
-﻿using ICMT.Core.Helpers;
+﻿using Core.Helpers;
+using ICMT.Core.Helpers;
 
 namespace ICMT.Core.Messages
 {
     public class Message : IMessage
     {
         internal readonly ByteConsumer Consumer = null!;
-        protected static readonly IReadOnlyList<byte> _magic = new byte[] { 0x69, 0x63, 0x6d, 0x74 };
+        protected const uint _magic = 1_768_123_764; // new byte[] { 0x69, 0x63, 0x6d, 0x74 } in BE;
+        protected static readonly IReadOnlyList<byte> _magicBytes = new byte[] { 0x69, 0x63, 0x6d, 0x74 };
         private bool _isValid = true;
 
         private static byte[]? _sessionId;
-        private static UInt32? _sequenceNumber;
+        private static uint? _sequenceNumber;
 
         /// <summary>
         /// 4 bytes
         /// </summary>
-        public byte[] Magic { get; set; } = null!;
+        public uint Magic { get; set; }
 
         /// <summary>
         /// 4 bytes
         /// </summary>
-        public UInt32 SequenceNumber { get; set; }
+        public uint SequenceNumber { get; set; }
 
         /// <summary>
         /// 1 byte
@@ -35,13 +37,14 @@ namespace ICMT.Core.Messages
         public Message(byte[] rawIcmpMessage)
         {
             Consumer = new ByteConsumer(rawIcmpMessage);
-            if (!Consumer.SkipTo(_magic))
+            if (!Consumer.SkipTo(_magicBytes))
             {
                 _isValid = false;
                 return;
             }
 
-            Magic = Consumer.Consume(4);
+            var magicBytes = Consumer.Consume(4);
+            Magic = BitConverter.ToUInt32(magicBytes);
 
             var seqNumBytes = Consumer.Consume(4);
             SequenceNumber = BitConverter.ToUInt32(seqNumBytes);
@@ -70,7 +73,7 @@ namespace ICMT.Core.Messages
         public bool IsValid()
         {
             if (MessageType == MessageType.Unknown) return false;
-            if (!Enumerable.SequenceEqual(Magic, _magic)) return false;
+            if (Magic != _magic) return false;
 
             return _isValid;
         }
@@ -85,8 +88,9 @@ namespace ICMT.Core.Messages
         {
             var buff = new List<byte>();
 
-            buff.AddRange(Magic);
-            var seq = BitConverter.GetBytes(SequenceNumber);
+            var mseq = BitConverterHelper.GetBytes(Magic, Endianness.BigEndian);
+            buff.AddRange(mseq);
+            var seq = BitConverterHelper.GetBytes(SequenceNumber, Endianness.BigEndian);
             buff.AddRange(seq);
             buff.Add((byte)MessageType);
             buff.AddRange(SessionId);

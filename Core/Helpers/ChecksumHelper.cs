@@ -7,11 +7,16 @@
             uint checksum = 0;
             using (var br = new BinaryReader(new FileStream(file, FileMode.Open)))
             {
+                int its = 0;
                 byte[] b = new byte[4];
-                while (0 < br.Read(b))
+                int r = 0;
+                while (0 < (r = br.Read(b)))
                 {
-                    uint r = BitConverter.ToUInt32(b);
-                    checksum ^= r;
+                    uint c = BitConverter.ToUInt32(b);
+                    checksum ^= c;
+
+                    //Console.WriteLine($"iterations: {its++}\nr: {r}\nc: {c}\nchecksum: {checksum}\n\n");
+
                 }
             }
             return BitConverter.GetBytes(checksum);

@@ -1,4 +1,6 @@
-﻿namespace ICMT.Core.Messages
+﻿using Core.Helpers;
+
+namespace ICMT.Core.Messages
 {
     public class DataMessage : Message, IMessage
     {
@@ -28,7 +30,7 @@
         public static DataMessage Empty()
         {
             DataMessage msg = new();
-            msg.Magic = Message._magic.ToArray();
+            msg.Magic = Message._magic;
             msg.MessageType = MessageType.DataMessage;
             return msg;
         }
@@ -38,7 +40,7 @@
             var buff = new List<byte>();
 
             buff.AddRange(base.Serialize());
-            var dl = BitConverter.GetBytes(DataLength);
+            var dl = BitConverterHelper.GetBytes(DataLength, Endianness.BigEndian);
             buff.AddRange(dl);
             buff.AddRange(Data);
 

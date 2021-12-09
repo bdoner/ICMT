@@ -35,7 +35,7 @@ namespace ICMT.Core.Messages
         public static SetupMessage Empty()
         {
             SetupMessage msg = new();
-            msg.Magic = Message._magic.ToArray();
+            msg.Magic = Message._magic;
             msg.MessageType = MessageType.SetupMessage;
             return msg;
         }

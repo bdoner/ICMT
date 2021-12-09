@@ -96,7 +96,7 @@ namespace ICMT
         {
             var buffer = msg.Serialize();
 
-            Console.WriteLine(string.Join(",", buffer.Select(x => x.ToString("x02"))));
+            //Console.WriteLine(string.Join(",", buffer.Select(x => x.ToString("x02"))));
 
             var reply = pinger.Send(Host, Timeout, buffer, pingOptions);
             if (reply.Status != IPStatus.Success && tryCount < MaxDataMessageRetries)
