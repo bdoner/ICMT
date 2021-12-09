@@ -1,6 +1,11 @@
 
-build: server
+server: server.c ICMT.h
 	gcc server.c -o server
 
-run: build
+
+
+run: server
 	sudo ./server 192.168.70.232
+
+clean:
+	rm server
