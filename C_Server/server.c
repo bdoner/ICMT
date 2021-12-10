@@ -1,9 +1,10 @@
 #include "ICMT.h"
- #include <sys/stat.h>
-#include <sys/types.h>
+#include "server.h"
+
+#include <sys/stat.h>
 #include <sys/unistd.h>
 #include <sys/types.h>
-#include <sys/socket.h>
+// #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -13,50 +14,7 @@
 
 #define DEBUG 0
 
-#define PROTO_ICMP 1
-#define TRUE 1
-#define FALSE 0
 #define BUFF_SIZE 1500
-
-int bind_socket(char *addr);
-void create_rcv_dir();
-int create_file(char *fileName);
-void drop_privs();
-unsigned int checksum_file(int fd_file);
-void print_msg(char *buff, int buffsize);
-
-
-void fill_message_head(message_head_t *msg, char *icmp_msg, ssize_t size) 
-{
-    memcpy(msg, icmp_msg + 28, sizeof(message_head_t));
-    msg->magic = ntohl(msg->magic);
-    msg->sequenceNum = ntohl(msg->sequenceNum);
-}
-
-void fill_message_setup(message_setup_t *msg, char *icmp_msg, ssize_t size) 
-{
-    memcpy(msg, icmp_msg + 28, sizeof(message_setup_t));
-    msg->magic = ntohl(msg->magic);
-    msg->sequenceNum = ntohl(msg->sequenceNum);
-}
-
-void fill_message_data(message_data_t *msg, char *icmp_msg, ssize_t size) 
-{
-    memcpy(msg, icmp_msg + 28, sizeof(message_data_t));
-    msg->magic = ntohl(msg->magic);
-    msg->sequenceNum = ntohl(msg->sequenceNum);
-    msg->dataLength = ntohs(msg->dataLength);
-}
-
-void fill_message_complete(message_complete_t *msg, char *icmp_msg, ssize_t size) 
-{
-    memcpy(msg, icmp_msg + 28, sizeof(message_complete_t));
-    msg->magic = ntohl(msg->magic);
-    msg->sequenceNum = ntohl(msg->sequenceNum);
-    //msg->checksum = ntohl(msg->checksum);
-}
-
-
 
 int main(int argc, char **argv)
 {
@@ -77,7 +35,7 @@ int main(int argc, char **argv)
     int fd = -1; // file to write to
     message_setup_t msg_setup; // contains sessionId
     long lastSeqNum = -1; // check sequence
-    while (TRUE)
+    while (1)
     {
         message_head_t msg_head;
 

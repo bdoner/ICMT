@@ -10,7 +10,11 @@ C_Server/server
 *.userosscache
 *.sln.docstates
 launchSettings.json
+
+# C_Server stuff 
 C_Server/received_files/*
+C_Server/*.out
+C_Server/*.o
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
