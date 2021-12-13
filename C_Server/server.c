@@ -14,63 +14,72 @@
 #define BUFF_SIZE 1500
 #define PROTO_ICMP 1
 
-
 short Verbosity = 0;
 
-void 
-parse_args(int argc, char **argv)
+void parse_args(int argc, char **argv)
 {
     int opt;
-    while(-1 != (opt = getopt(argc, argv, "cvb:")))
+    while (-1 != (opt = getopt(argc, argv, "cvb:")))
     {
         switch (opt)
         {
         case 'c':
-            /* code */
+            int fd = open_file(optarg);
+            unsigned int cs = checksum_file(fd);
+
+            printf("checksum of file \"%s\" is %04x\n", optarg, cs);
+
+            exit(0);
             break;
-        
+        case 'v':
+            Verbosity = atoi(optarg);
+            break;
+        case 'b':
+            // bind socket and listen
+            break;
         default:
             break;
         }
     }
 
-    if(argc < 2)
+    if (argc < 2)
     {
         usage(argv[0]);
         exit(0);
     }
 
     getopt(argc, argv, "s:");
-    
-    char* check_file = NULL;
-    for(int i = 0; i < argc; i++) {
+
+    char *check_file = NULL;
+    for (int i = 0; i < argc; i++)
+    {
         printf("argv[%d] = '%s'\n", i, argv[i]);
-        if(0 == memcmp(argv[i], "-vvv", 4)) 
+        if (0 == memcmp(argv[i], "-vvv", 4))
         {
             Verbosity = 3;
         }
-        else if(0 == memcmp(argv[i], "-vv", 3))
+        else if (0 == memcmp(argv[i], "-vv", 3))
         {
             Verbosity = 2;
         }
-        else if(0 == memcmp(argv[i], "-v", 2))
+        else if (0 == memcmp(argv[i], "-v", 2))
         {
             Verbosity = 1;
         }
 
-        if(0 == memcmp(argv[i], "-c", 2) && i < argc - 1)
+        if (0 == memcmp(argv[i], "-c", 2) && i < argc - 1)
         {
             check_file = argv[i + 1];
         }
 
-        if(0 == memcmp(argv[i], "-h", 2))
+        if (0 == memcmp(argv[i], "-h", 2))
         {
             usage(argv[0]);
             exit(0);
         }
     }
 
-    if(check_file) 
+    if (check_file)
     {
         int fd = open_file(check_file);
         unsigned int cs = checksum_file(fd);
@@ -83,18 +92,14 @@ parse_args(int argc, char **argv)
     printf("verbosity level: %d\n", Verbosity);
 }
 
-
-
 // End of main ---------------------------------------------
 
-int
-bind_socket(char *addr) 
+int bind_socket(char *addr)
 {
     struct sockaddr_in sock_addr;
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_port = htons(0);
     inet_aton(addr, &sock_addr.sin_addr.s_addr);
-
 
     int sockfd = socket(AF_INET, SOCK_RAW, PROTO_ICMP);
     if (sockfd == -1)
@@ -102,9 +107,9 @@ bind_socket(char *addr)
         perror("could not create socket");
         exit(-1);
     }
-    
+
     int bindres = bind(sockfd, &sock_addr, sizeof(sock_addr));
-    if(bindres == -1) 
+    if (bindres == -1)
     {
         perror("could not bind socket");
         exit(-1);
@@ -115,14 +120,12 @@ bind_socket(char *addr)
     return sockfd;
 }
 
-
-void
-create_rcv_dir() 
+void create_rcv_dir()
 {
     const char rf[] = "./received_files/";
 
     struct stat st = {0};
-    if(-1 != stat(rf, &st)) 
+    if (-1 != stat(rf, &st))
     {
         if (1 == Verbosity)
         {
@@ -132,7 +135,8 @@ create_rcv_dir()
     }
 
     int fd = mkdir(rf, 0755);
-    if(fd < 0) {
+    if (fd < 0)
+    {
         perror("could not create './received_files' directory");
         exit(-1);
     }
@@ -140,19 +144,18 @@ create_rcv_dir()
     printf("created empty directory \"%s\".\n", rf);
 }
 
-void 
-usage(char* self)
+void usage(char *self)
 {
     printf("usage: %s <bind ip> [-v|-vv|-vvv]\n", self);
     printf("usage: %s -c <file> [-v|-vv|-vvv] \n", self);
 }
 
-int
-open_file(char *filepath)
+int open_file(char *filepath)
 {
     int fd = open(filepath, O_RDWR | O_CREAT, 0644);
 
-    if(fd < 0) {
+    if (fd < 0)
+    {
         perror("could not create file");
         exit(-1);
     }
@@ -162,8 +165,7 @@ open_file(char *filepath)
     return fd;
 }
 
-int
-create_file(char *fileName)
+int create_file(char *fileName)
 {
     const char rf[] = "./received_files/";
     char *finalPath = malloc(strlen(rf) + strlen(fileName) + 1);
@@ -178,36 +180,36 @@ create_file(char *fileName)
     return fd;
 }
 
-void
-drop_privs()
+void drop_privs()
 {
 
     char *sudo_gid = getenv("SUDO_GID");
     int gid = getgid();
 
-    if(sudo_gid != NULL && 0 < strlen(sudo_gid)) {
+    if (sudo_gid != NULL && 0 < strlen(sudo_gid))
+    {
         gid = atoi(sudo_gid);
     }
 
-    if(setgid(gid) < 0)
+    if (setgid(gid) < 0)
     {
         perror("could not drop group privs");
     }
 
-
-    char *sudo_uid = getenv("SUDO_UID"); 
+    char *sudo_uid = getenv("SUDO_UID");
     int uid = getuid();
 
-    if(sudo_uid != NULL && 0 < strlen(sudo_uid)) {
+    if (sudo_uid != NULL && 0 < strlen(sudo_uid))
+    {
         uid = atoi(sudo_uid);
     }
 
-    if(setuid(uid) < 0)
+    if (setuid(uid) < 0)
     {
         perror("could not drop user privs");
     }
 
-    if(2 == Verbosity) 
+    if (2 == Verbosity)
     {
         printf("dropped privileges to user privs.\n");
     }
@@ -233,22 +235,22 @@ checksum_file(int fd)
     unsigned int its = 0, loop = 0;
 
     char buff[4096];
-    while(0 < (r = read(fd, buff, 4096)))
+    while (0 < (r = read(fd, buff, 4096)))
     {
-        if (r < 4096) 
+        if (r < 4096)
         {
             memset(buff + r, 0, 4096 - r);
         }
 
-        for(ssize_t i = 0; i < r; i += 4)
+        for (ssize_t i = 0; i < r; i += 4)
         {
             c = *(unsigned int *)(buff + i);
             checksum ^= c;
 
-            if (its++ % 1000000 == 0) 
+            if (its++ % 1000000 == 0)
             {
                 printf("loop: %u\niterations: %u\nr: %ld\nc: %u\nchecksum: %u\n\n",
-                    loop, its, r, c, checksum);
+                       loop, its, r, c, checksum);
             }
 
             c = 0;
@@ -256,7 +258,7 @@ checksum_file(int fd)
         loop++;
     }
 
-    if(r == -1) 
+    if (r == -1)
     {
         perror("error reading file for checksumming");
     }
@@ -264,43 +266,41 @@ checksum_file(int fd)
     return checksum;
 }
 
-void 
-print_msg(char *buff, int buffsize) 
+void print_msg(char *buff, int buffsize)
 {
-    if(3 != Verbosity)
+    if (3 != Verbosity)
     {
         return
     }
 
     for (int i = 0; i < buffsize; i++)
+    {
+        if (i != 0 && i % 8 == 0)
         {
-            if (i != 0 && i % 8 == 0)
+            if (i % 32 == 0)
             {
-                if (i % 32 == 0)
-                {
-                    printf("\n");
-                }
-                else if (i % 16 == 0)
-                {
-                    printf("\t");
-                }
-                else
-                {
-                    printf(" ");
-                }
+                printf("\n");
             }
-            printf("%02hhx ", buff[i]);
+            else if (i % 16 == 0)
+            {
+                printf("\t");
+            }
+            else
+            {
+                printf(" ");
+            }
         }
+        printf("%02hhx ", buff[i]);
+    }
 
-        printf("\n-----\n");
+    printf("\n-----\n");
 }
 
-int 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
     parse_args(argc, argv);
 
-    if(2 == Verbosity)
+    if (2 == Verbosity)
     {
         int uid = getuid();
         int gid = getgid();
@@ -308,48 +308,49 @@ main(int argc, char **argv)
         printf("running as uid: '%d' and gid: '%d'.\n", uid, gid);
     }
 
-
     int sockfd = bind_socket(argv[1]);
     drop_privs();
     create_rcv_dir();
 
     char buff[BUFF_SIZE];
-    
-    int fd = -1; // file to write to
+
+    int fd = -1;             // file to write to
     message_setup msg_setup; // contains sessionId
-    long lastSeqNum = -1; // check sequence
+    long lastSeqNum = -1;    // check sequence
     while (1)
     {
         message_head msg_head;
 
         // clear buffer
         memset(buff, 0, BUFF_SIZE);
-        
+
         printf("listening for messages...\n");
         ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);
         fill_message_head(&msg_head, buff, recv_size);
 
         print_msg(buff + 28, recv_size - 28);
 
-        if(msg_head.magic != ICMT_MAGIC) {
-            continue;
-        }       
-
-       char *mg_hdr = (char*)&msg_head.magic;
-
-        if(3 == Verbosity)
+        if (msg_head.magic != ICMT_MAGIC)
         {
-            printf("message magic (unsigned int): %u\n",  msg_head.magic);
-            printf("message magic (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
-                mg_hdr[0], mg_hdr[1], mg_hdr[2], mg_hdr[3]);
-            printf("seqNum (uint): %u\n", msg_head.sequenceNum);
-            printf("type (char): %d\n", msg_head.messageType);
-            printf("sessionId (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n", 
-                msg_head.sessionId[0], msg_head.sessionId[1], msg_head.sessionId[2], msg_head.sessionId[3]);
+            continue;
         }
 
-        if(msg_head.sequenceNum <= lastSeqNum) {
-            if(3 == Verbosity)
+        char *mg_hdr = (char *)&msg_head.magic;
+
+        if (3 == Verbosity)
+        {
+            printf("message magic (unsigned int): %u\n", msg_head.magic);
+            printf("message magic (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n",
+                   mg_hdr[0], mg_hdr[1], mg_hdr[2], mg_hdr[3]);
+            printf("seqNum (uint): %u\n", msg_head.sequenceNum);
+            printf("type (char): %d\n", msg_head.messageType);
+            printf("sessionId (byte[4]): [%02hhx, %02hhx, %02hhx, %02hhx]\n",
+                   msg_head.sessionId[0], msg_head.sessionId[1], msg_head.sessionId[2], msg_head.sessionId[3]);
+        }
+
+        if (msg_head.sequenceNum <= lastSeqNum)
+        {
+            if (3 == Verbosity)
             {
                 printf("last seq was %ld this seq is %u\n", lastSeqNum, msg_head.sequenceNum);
             }
@@ -360,11 +361,11 @@ main(int argc, char **argv)
 
         //printf("PAST seq-check:\n");
 
-        if (msg_head.messageType == MSGTYPE_SETUP) 
+        if (msg_head.messageType == MSGTYPE_SETUP)
         {
-            #if DEBUG
+#if DEBUG
             printf("SETUP:\n");
-            #endif
+#endif
 
             // fill struct
             fill_message_setup(&msg_setup, buff, sizeof(message_setup));
@@ -374,38 +375,38 @@ main(int argc, char **argv)
 
             // get fd for final file
             fd = create_file(msg_setup.fileName);
-        } 
-        else if(msg_head.messageType == MSGTYPE_DATA)
+        }
+        else if (msg_head.messageType == MSGTYPE_DATA)
         {
-            #if DEBUG
+#if DEBUG
             printf("DATA:\n");
-            #endif
+#endif
 
             message_data msg_data;
             fill_message_data(&msg_data, buff, sizeof(message_data));
 
-            #if DEBUG
+#if DEBUG
             printf("sizeof(message_data_t): %ld\n", sizeof(message_data_t));
             printf("fd: %d\n", fd);
             printf("msg_data.dataLength: %hu\n", msg_data.dataLength);
 
-            #endif
+#endif
 
             ssize_t w = write(fd, msg_data.data, msg_data.dataLength);
-            if(w == -1) 
+            if (w == -1)
             {
                 perror("error writing file");
             }
 
-            #if DEBUG
+#if DEBUG
             printf("Wrote %ld bytes of %d\n", w, msg_data.dataLength);
-            #endif
+#endif
         }
-        else if(msg_head.messageType == MSGTYPE_COMPLETE)
+        else if (msg_head.messageType == MSGTYPE_COMPLETE)
         {
-            #if DEBUG
+#if DEBUG
             printf("COMPLETE:\n");
-            #endif
+#endif
 
             message_complete msg_complete;
             fill_message_complete(&msg_complete, buff, sizeof(message_complete));
@@ -420,6 +421,5 @@ main(int argc, char **argv)
 
             lastSeqNum = -1;
         }
-        
     }
 }
