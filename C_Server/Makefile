@@ -2,7 +2,7 @@
 .SUFFIXES:
 
 CC		= cc
-CFLAGS	= -W -O
+CFLAGS	= -W -g
 LDLIBS	= -lm
 BIND_ADDR	= 192.168.70.232
 

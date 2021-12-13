@@ -11,19 +11,49 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define DEBUG 0
-
 #define BUFF_SIZE 1500
+
+short Verbosity = 0;
+
+void parseArgs(int argc, char **argv)
+{
+    if(argc < 2) 
+    {
+        printf("usage: %s <bind ip> [-v|-vv|-vvv]\n", argv[0]);
+        exit(0);
+    }
+    
+    for(int i = 0; i < argc; i++) {
+        printf("argv[%d] = '%s'\n", i, argv[i]);
+        if(0 == memcmp(argv[i], "-vvv", 4)) 
+        {
+            Verbosity = 3;
+        }
+        else if(0 == memcmp(argv[i], "-vv", 3))
+        {
+            Verbosity = 2;
+        }
+        else if(0 == memcmp(argv[i], "-v", 2))
+        {
+            Verbosity = 1;
+        }
+    }
+
+    printf("verbosity level: %d\n", Verbosity);
+}
 
 int main(int argc, char **argv)
 {
-    #if DEBUG
-    for(int i = 0; i < argc; i++) {
-        printf("argv[%d] = '%s'\n", i, argv[i]);
-    }
-    #endif
+    parseArgs(argc, argv);
 
-    //printf("uid: %d\neuid: %d\nSUDO_UID: %s\n", getuid(), geteuid(), getenv("SUDO_UID"));
+    if(2 == Verbosity)
+    {
+        int uid = getuid();
+        int gid = getgid();
+
+        printf("running as uid: '%d' and gid: '%d'.\n", uid, gid);
+    }
+
 
     int sockfd = bind_socket(argv[1]);
     drop_privs();
@@ -32,11 +62,11 @@ int main(int argc, char **argv)
     char buff[BUFF_SIZE];
     
     int fd = -1; // file to write to
-    message_setup_t msg_setup; // contains sessionId
+    message_setup msg_setup; // contains sessionId
     long lastSeqNum = -1; // check sequence
     while (1)
     {
-        message_head_t msg_head;
+        message_head msg_head;
 
         // clear buffer
         memset(buff, 0, BUFF_SIZE);
@@ -80,7 +110,7 @@ int main(int argc, char **argv)
             #endif
 
             // fill struct
-            fill_message_setup(&msg_setup, buff, sizeof(message_setup_t));
+            fill_message_setup(&msg_setup, buff, sizeof(message_setup));
 
             // set filename terminating null byte
             msg_setup.fileName[msg_setup.fileNameLength + 1] = 0;
@@ -94,8 +124,8 @@ int main(int argc, char **argv)
             printf("DATA:\n");
             #endif
 
-            message_data_t msg_data;
-            fill_message_data(&msg_data, buff, sizeof(message_data_t));
+            message_data msg_data;
+            fill_message_data(&msg_data, buff, sizeof(message_data));
 
             #if DEBUG
             printf("sizeof(message_data_t): %ld\n", sizeof(message_data_t));
@@ -120,8 +150,8 @@ int main(int argc, char **argv)
             printf("COMPLETE:\n");
             #endif
 
-            message_complete_t msg_complete;
-            fill_message_complete(&msg_complete, buff, sizeof(message_complete_t));
+            message_complete msg_complete;
+            fill_message_complete(&msg_complete, buff, sizeof(message_complete));
 
             fsync(fd);
 
@@ -161,6 +191,8 @@ int bind_socket(char *addr)
         exit(-1);
     }
 
+    printf("bound socket to %s.\n", addr);
+
     return sockfd;
 }
 
@@ -172,6 +204,10 @@ void create_rcv_dir()
     struct stat st = {0};
     if(-1 != stat(rf, &st)) 
     {
+        if (1 == Verbosity)
+        {
+            printf("directory \"%s\" already exists.\n", rf);
+        }
         return;
     }
 
@@ -180,6 +216,8 @@ void create_rcv_dir()
         perror("could not create './received_files' directory");
         exit(-1);
     }
+
+    printf("created empty directory \"%s\".\n", rf);
 }
 
 
@@ -192,15 +230,16 @@ int create_file(char *fileName)
     finalPath[strlen(rf) + strlen(fileName)] = 0;
 
     unlink(finalPath);
-    printf("creating file %s\n", finalPath);
 
     int fd = open(finalPath, O_RDWR | O_CREAT, 0644);
-    free(finalPath);
 
     if(fd < 0) {
         perror("could not create file");
         exit(-1);
     }
+
+    printf("opened file \"%s\" for writing.\n", finalPath);
+    free(finalPath);
 
     return fd;
 }
@@ -232,11 +271,24 @@ void drop_privs()
     {
         perror("could not drop user privs");
     }
+
+    if(2 == Verbosity) 
+    {
+        printf("dropped privileges to user privs.\n");
+    }
 }
 
 unsigned int checksum_file(int fd)
 {
-    printf("generating checksum for file..\n");
+    char selfpath[255];
+    sprintf(selfpath, "/proc/self/fd/%d", fd);
+
+    char *dstfile = malloc(255);
+    int lnk_dst_size = readlink(selfpath, dstfile, 255);
+    dstfile[lnk_dst_size] = 0;
+
+    printf("generating checksum for file \"%s\".\n", dstfile);
+    free(dstfile);
     lseek(fd, 0, SEEK_SET);
 
     unsigned int checksum = 0;
