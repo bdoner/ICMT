@@ -12,6 +12,7 @@ C_Server/server
 launchSettings.json
 
 # C_Server stuff 
+C_Server/.vscode/
 C_Server/received_files/*
 C_Server/*.out
 C_Server/*.o
