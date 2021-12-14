@@ -1,5 +1,6 @@
 .POSIX:
 .SUFFIXES:
+.PHONY: run clean
 
 CC		= cc
 CFLAGS	= -W -g
@@ -15,8 +16,8 @@ server.o: server.c
 ICMT.o: ICMT.c
 	$(CC) -c $(CFLAGS) ICMT.c
 
-run: server
-	sudo ./server $(BIND_ADDR)
+run: icmt-server
+	sudo ./icmt-server -v 4 -b $(BIND_ADDR)
 
 clean:
 	rm server icmt-server *.o

@@ -1,15 +1,15 @@
 #include "ICMT.h"
 
-#include <sys/stat.h>
-#include <sys/unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <string.h>
-#include <getopt.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/unistd.h>
 
 #define BUFF_SIZE 1500
 #define PROTO_ICMP 1
@@ -65,13 +65,16 @@ checksum_file(int fd)
 
     unsigned int checksum = 0;
     ssize_t r = 0;
+    int loops = 0;
 
-    char buff[4096];
-    while (0 < (r = read(fd, buff, 4096)))
+    const int BSIZE = 4096000;
+    char *buff = malloc(BSIZE);
+    while (0 < (r = read(fd, buff, BSIZE)))
     {
-        if (r < 4096)
+        loops++;
+        if (r < BSIZE)
         {
-            memset(buff + r, 0, 4096 - r);
+            memset(buff + r, 0, BSIZE - r);
         }
 
         for (ssize_t i = 0; i < r; i += 4)
@@ -84,6 +87,8 @@ checksum_file(int fd)
     {
         perror("checksum_file: error reading file for checksumming");
     }
+
+    free(buff);
 
     return checksum;
 }
@@ -237,7 +242,7 @@ int start_server(char *addr)
     int fd = -1;             // file to write to
     message_setup msg_setup; // contains sessionId
     long lastSeqNum = -1;    // check sequence
-    
+
     printf("listening for messages...\n");
     while (1)
     {
@@ -321,7 +326,7 @@ int start_server(char *addr)
         }
         else if (msg_head.messageType == MSGTYPE_COMPLETE)
         {
-            
+
             message_complete msg_complete;
             fill_message_complete(&msg_complete, buff, sizeof(message_complete));
 
