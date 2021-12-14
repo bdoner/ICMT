@@ -6,8 +6,8 @@ CFLAGS	= -W -g
 LDLIBS	= -lm
 BIND_ADDR	= 192.168.70.232
 
-server: server.o ICMT.o
-	$(CC) $(LDFLAGS) -o server server.o ICMT.o $(LDLIBS)
+icmt-server: server.o ICMT.o
+	$(CC) $(LDFLAGS) -o icmt-server server.o ICMT.o $(LDLIBS)
 
 server.o: server.c
 	$(CC) -c $(CFLAGS) server.c
@@ -19,4 +19,4 @@ run: server
 	sudo ./server $(BIND_ADDR)
 
 clean:
-	rm server *.o
+	rm server icmt-server *.o
