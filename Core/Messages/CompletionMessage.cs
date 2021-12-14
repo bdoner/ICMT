@@ -31,6 +31,7 @@
             var buff = new List<byte>();
 
             buff.AddRange(base.Serialize());
+            if(BitConverter.IsLittleEndian) Checksum = Checksum.Reverse().ToArray();
             buff.AddRange(Checksum);
 
             return buff.ToArray();

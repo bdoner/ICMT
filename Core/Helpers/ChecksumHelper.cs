@@ -1,7 +1,14 @@
-﻿namespace ICMT.Core.Helpers
+﻿using Core.Helpers;
+
+namespace ICMT.Core.Helpers
 {
     public class ChecksumHelper
     {
+        /// <summary>
+        /// Returns the 4 bytes of a 32 bit unsigned integer in big endian encoding
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
         public static byte[] GetFileChecksum(string file)
         {
             uint checksum = 0;

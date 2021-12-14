@@ -30,5 +30,5 @@ void fill_message_complete(message_complete *msg, char *icmp_msg, ssize_t size)
     memcpy(msg, icmp_msg + 28, sizeof(message_complete));
     msg->magic = ntohl(msg->magic);
     msg->sequenceNum = ntohl(msg->sequenceNum);
-    //msg->checksum = ntohl(msg->checksum);
+    msg->checksum = ntohl(msg->checksum);
 }

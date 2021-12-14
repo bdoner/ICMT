@@ -14,85 +14,79 @@
 #define BUFF_SIZE 1500
 #define PROTO_ICMP 1
 
-short Verbosity = 0;
-
-void parse_args(int argc, char **argv)
+enum Verbosity
 {
-    int opt;
-    while (-1 != (opt = getopt(argc, argv, "cvb:")))
+    FATAL,
+    ERROR,
+    WARN,
+    INFO,
+    DEBUG,
+
+    VERB_MAX
+};
+
+char *Verbosities[] = {
+    [FATAL] = "FATAL",
+    [ERROR] = "ERROR",
+    [WARN] = "WARN",
+    [INFO] = "INFO",
+    [DEBUG] = "DEBUG"};
+
+enum Verbosity Verbosity = 0;
+
+int open_file(char *filepath, int oflags)
+{
+    int fd = open(filepath, oflags, 0644);
+
+    if (fd < 0)
     {
-        switch (opt)
-        {
-        case 'c':
-            int fd = open_file(optarg);
-            unsigned int cs = checksum_file(fd);
-
-            printf("checksum of file \"%s\" is %04x\n", optarg, cs);
-
-            exit(0);
-            break;
-        case 'v':
-            Verbosity = atoi(optarg);
-            break;
-        case 'b':
-            // bind socket and listen
-            break;
-        default:
-            break;
-        }
+        perror("open_file: could not create file");
+        exit(-1);
     }
 
-    if (argc < 2)
-    {
-        usage(argv[0]);
-        exit(0);
-    }
+    printf("opened file \"%s\" for read/write.\n", filepath);
 
-    getopt(argc, argv, "s:");
-
-    char *check_file = NULL;
-    for (int i = 0; i < argc; i++)
-    {
-        printf("argv[%d] = '%s'\n", i, argv[i]);
-        if (0 == memcmp(argv[i], "-vvv", 4))
-        {
-            Verbosity = 3;
-        }
-        else if (0 == memcmp(argv[i], "-vv", 3))
-        {
-            Verbosity = 2;
-        }
-        else if (0 == memcmp(argv[i], "-v", 2))
-        {
-            Verbosity = 1;
-        }
-
-        if (0 == memcmp(argv[i], "-c", 2) && i < argc - 1)
-        {
-            check_file = argv[i + 1];
-        }
-
-        if (0 == memcmp(argv[i], "-h", 2))
-        {
-            usage(argv[0]);
-            exit(0);
-        }
-    }
-
-    if (check_file)
-    {
-        int fd = open_file(check_file);
-        unsigned int cs = checksum_file(fd);
-
-        printf("checksum of file \"%s\" is %04x\n", check_file, cs);
-
-        exit(0);
-    }
-
-    printf("verbosity level: %d\n", Verbosity);
+    return fd;
 }
 
-// End of main ---------------------------------------------
+unsigned int
+checksum_file(int fd)
+{
+    char selfpath[255];
+    sprintf(selfpath, "/proc/self/fd/%d", fd);
+
+    char *dstfile = malloc(255);
+    int lnk_dst_size = readlink(selfpath, dstfile, 255);
+    dstfile[lnk_dst_size] = 0;
+
+    printf("generating checksum for file \"%s\".\n", dstfile);
+    free(dstfile);
+    lseek(fd, 0, SEEK_SET);
+
+    unsigned int checksum = 0;
+    ssize_t r = 0;
+
+    char buff[4096];
+    while (0 < (r = read(fd, buff, 4096)))
+    {
+        if (r < 4096)
+        {
+            memset(buff + r, 0, 4096 - r);
+        }
+
+        for (ssize_t i = 0; i < r; i += 4)
+        {
+            checksum ^= *(unsigned int *)(buff + i);
+        }
+    }
+
+    if (r == -1)
+    {
+        perror("checksum_file: error reading file for checksumming");
+    }
+
+    return checksum;
+}
 
 int bind_socket(char *addr)
 {
@@ -144,27 +138,6 @@ void create_rcv_dir()
     printf("created empty directory \"%s\".\n", rf);
 }
 
-void usage(char *self)
-{
-    printf("usage: %s <bind ip> [-v|-vv|-vvv]\n", self);
-    printf("usage: %s -c <file> [-v|-vv|-vvv] \n", self);
-}
-
-int open_file(char *filepath)
-{
-    int fd = open(filepath, O_RDWR | O_CREAT, 0644);
-
-    if (fd < 0)
-    {
-        perror("could not create file");
-        exit(-1);
-    }
-
-    printf("opened file \"%s\" for writing.\n", filepath);
-
-    return fd;
-}
-
 int create_file(char *fileName)
 {
     const char rf[] = "./received_files/";
@@ -174,7 +147,7 @@ int create_file(char *fileName)
     finalPath[strlen(rf) + strlen(fileName)] = 0;
 
     unlink(finalPath);
-    int fd = open_file(finalPath);
+    int fd = open_file(finalPath, O_RDWR | O_CREAT);
     free(finalPath);
 
     return fd;
@@ -215,62 +188,11 @@ void drop_privs()
     }
 }
 
-unsigned int
-checksum_file(int fd)
-{
-    char selfpath[255];
-    sprintf(selfpath, "/proc/self/fd/%d", fd);
-
-    char *dstfile = malloc(255);
-    int lnk_dst_size = readlink(selfpath, dstfile, 255);
-    dstfile[lnk_dst_size] = 0;
-
-    printf("generating checksum for file \"%s\".\n", dstfile);
-    free(dstfile);
-    lseek(fd, 0, SEEK_SET);
-
-    unsigned int checksum = 0;
-    unsigned int c;
-    ssize_t r = 0;
-    unsigned int its = 0, loop = 0;
-
-    char buff[4096];
-    while (0 < (r = read(fd, buff, 4096)))
-    {
-        if (r < 4096)
-        {
-            memset(buff + r, 0, 4096 - r);
-        }
-
-        for (ssize_t i = 0; i < r; i += 4)
-        {
-            c = *(unsigned int *)(buff + i);
-            checksum ^= c;
-
-            if (its++ % 1000000 == 0)
-            {
-                printf("loop: %u\niterations: %u\nr: %ld\nc: %u\nchecksum: %u\n\n",
-                       loop, its, r, c, checksum);
-            }
-
-            c = 0;
-        }
-        loop++;
-    }
-
-    if (r == -1)
-    {
-        perror("error reading file for checksumming");
-    }
-
-    return checksum;
-}
-
 void print_msg(char *buff, int buffsize)
 {
-    if (3 != Verbosity)
+    if (Verbosity < DEBUG)
     {
-        return
+        return;
     }
 
     for (int i = 0; i < buffsize; i++)
@@ -296,11 +218,9 @@ void print_msg(char *buff, int buffsize)
     printf("\n-----\n");
 }
 
-int main(int argc, char **argv)
+int start_server(char *addr)
 {
-    parse_args(argc, argv);
-
-    if (2 == Verbosity)
+    if (Verbosity >= INFO)
     {
         int uid = getuid();
         int gid = getgid();
@@ -308,7 +228,7 @@ int main(int argc, char **argv)
         printf("running as uid: '%d' and gid: '%d'.\n", uid, gid);
     }
 
-    int sockfd = bind_socket(argv[1]);
+    int sockfd = bind_socket(addr);
     drop_privs();
     create_rcv_dir();
 
@@ -317,6 +237,8 @@ int main(int argc, char **argv)
     int fd = -1;             // file to write to
     message_setup msg_setup; // contains sessionId
     long lastSeqNum = -1;    // check sequence
+    
+    printf("listening for messages...\n");
     while (1)
     {
         message_head msg_head;
@@ -324,7 +246,6 @@ int main(int argc, char **argv)
         // clear buffer
         memset(buff, 0, BUFF_SIZE);
 
-        printf("listening for messages...\n");
         ssize_t recv_size = recv(sockfd, buff, BUFF_SIZE, 0);
         fill_message_head(&msg_head, buff, recv_size);
 
@@ -395,19 +316,12 @@ int main(int argc, char **argv)
             ssize_t w = write(fd, msg_data.data, msg_data.dataLength);
             if (w == -1)
             {
-                perror("error writing file");
+                perror("start_server: error writing file");
             }
-
-#if DEBUG
-            printf("Wrote %ld bytes of %d\n", w, msg_data.dataLength);
-#endif
         }
         else if (msg_head.messageType == MSGTYPE_COMPLETE)
         {
-#if DEBUG
-            printf("COMPLETE:\n");
-#endif
-
+            
             message_complete msg_complete;
             fill_message_complete(&msg_complete, buff, sizeof(message_complete));
 
@@ -422,4 +336,71 @@ int main(int argc, char **argv)
             lastSeqNum = -1;
         }
     }
+
+    return EXIT_SUCCESS;
+}
+
+void usage(char *self)
+{
+    printf("usage: %s [-v level] (-c <file> | -b <bind ip>)\n", self);
+    printf("-c <file>\tCalculate the checksum of a file. Print checksum and exit.\n");
+    printf("-b <bind ip>\tBind socket to ip and start server listening for ICMT messages. Use CTRL+C to exit.\n");
+    printf("-v level\tSet verbosity levels. -v must come before -b or -c in order to be effective. Default is FATAL.\n\t\tLevels are:\n");
+    for (int level = 0; level < VERB_MAX; level++)
+    {
+        printf("\t\t  %s: %d\n", Verbosities[level], level);
+    }
+}
+
+int main(int argc, char **argv)
+{
+    int opt;
+    while (-1 != (opt = getopt(argc, argv, "c:v:b:h")))
+    {
+
+        if (Verbosity >= INFO)
+        {
+            printf("getopt: %c = %s\n", opt, optarg);
+        }
+
+        switch (opt)
+        {
+        case 'c':
+        {
+
+            int fd = open_file(optarg, O_RDONLY);
+            unsigned int cs = checksum_file(fd);
+
+            printf("checksum of file \"%s\" is %04x\n", optarg, cs);
+
+            exit(EXIT_SUCCESS);
+            break;
+        }
+        case 'v':
+            Verbosity = (enum Verbosity)atoi(optarg);
+            break;
+        case 'b':
+        {
+
+            char *addr = optarg;
+            return start_server(addr);
+            break;
+        }
+        case 'h':
+            usage(argv[0]);
+            exit(EXIT_SUCCESS);
+            break;
+        default:
+            printf("unknown option.\n");
+            usage(argv[0]);
+            exit(EXIT_FAILURE);
+
+            break;
+        }
+    }
+
+    printf("missing argument.\n");
+    usage(argv[0]);
+
+    return EXIT_SUCCESS;
 }
